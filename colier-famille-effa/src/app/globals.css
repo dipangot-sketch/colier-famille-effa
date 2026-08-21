@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/*
+  Variables de thème par défaut (Partie 9 §40). Chaque profil les
+  surcharge dynamiquement via ThemeProvider (voir
+  src/components/layout/ThemeProvider.tsx) à partir des données lues
+  en base. Le reste de l'application ne doit jamais coder une couleur
+  en dur : tout passe par ces variables.
+*/
+:root {
+  --cfe-primary: #6c63ff;
+  --cfe-secondary: #1a1b26;
+  --cfe-accent: #ff6584;
+  --cfe-background: #14151f;
+  --cfe-surface: rgba(255, 255, 255, 0.06);
+  --cfe-text: #e8e8f0;
+  --cfe-muted: #9497b0;
+  --cfe-font-display: "Space Grotesk", sans-serif;
+  --cfe-font-body: "Inter", sans-serif;
+  --cfe-font-letter: "Space Grotesk", sans-serif;
+}
+
+@theme inline {
+  --color-cfe-primary: var(--cfe-primary);
+  --color-cfe-secondary: var(--cfe-secondary);
+  --color-cfe-accent: var(--cfe-accent);
+  --color-cfe-background: var(--cfe-background);
+  --color-cfe-surface: var(--cfe-surface);
+  --color-cfe-text: var(--cfe-text);
+  --color-cfe-muted: var(--cfe-muted);
+  --font-cfe-display: var(--cfe-font-display);
+  --font-cfe-body: var(--cfe-font-body);
+  --font-cfe-letter: var(--cfe-font-letter);
+}
+
+html,
+body {
+  background: var(--cfe-background);
+  color: var(--cfe-text);
+  font-family: var(--cfe-font-body);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Panneau "verre" réutilisé par la connexion, le menu, le chat, les
+   cartes de sélection (Partie 5 §4, Partie 9 §10). Effet volontairement
+   léger : la lisibilité prime toujours sur la décoration. */
+.cfe-glass {
+  background: var(--cfe-surface);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+/* Défilement lent de la lettre personnelle (Partie 5 §10, Partie 9 §19-20). */
+@keyframes cfe-letter-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(var(--cfe-scroll-distance, -40%));
+  }
+}
+
+.cfe-letter-scroll {
+  animation: cfe-letter-scroll var(--cfe-scroll-duration, 40s) linear infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cfe-letter-scroll {
+    animation: none;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Décorations discrètes du profil (Partie 5 §41-42, Partie 9 §41-42, 45-48). */
+@keyframes cfe-float {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(4deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes cfe-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes cfe-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.cfe-decoration-float {
+  animation: cfe-float var(--cfe-decoration-duration, 9s) ease-in-out infinite;
+}
+
+.cfe-decoration-twinkle {
+  animation: cfe-twinkle var(--cfe-decoration-duration, 6s) ease-in-out infinite;
+}
+
+.cfe-decoration-glow {
+  animation: cfe-glow-pulse var(--cfe-decoration-duration, 7s) ease-in-out infinite;
+}
+
+::selection {
+  background: var(--cfe-primary);
+  color: white;
+}
