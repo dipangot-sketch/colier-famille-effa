@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { PrismaClient, type RoleName } from "../src/generated/prisma/client";
+import { PrismaClient, type RoleName } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "../src/lib/auth/password";
 import { createQrTokenForProfile } from "../src/lib/auth/qr";
@@ -151,8 +151,8 @@ async function seedThemes() {
   for (const t of SEED_THEMES) {
     themesBySlug[t.slug] = await prisma.theme.upsert({
       where: { slug: t.slug },
-      update: { ...t },
-      create: { ...t },
+      update: { ...t } as any,
+      create: { ...t } as any,
     });
   }
   return themesBySlug;

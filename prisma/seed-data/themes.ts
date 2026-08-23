@@ -1,4 +1,4 @@
-import type { AvatarShape } from "../../src/generated/prisma/client";
+import type { AvatarShape } from "@/generated/prisma/client";
 
 export type SeedTheme = {
   name: string;
@@ -17,16 +17,10 @@ export type SeedTheme = {
   avatarDefaultShape: AvatarShape;
   cardStyle: string;
   buttonStyle: string;
-  decorationConfig: Record<string, unknown>;
-  animationConfig: Record<string, unknown>;
+  decorationConfig: any; // Correction : any pour compatibilité Prisma
+  animationConfig: any; // Correction : any
 };
 
-/**
- * 12 thèmes de base (Partie 3 §14, Partie 9 §3, Partie 12 §9).
- * Les quatre premiers sont les thèmes initiaux assignés à Monseralt,
- * Marion, Elema et Martin ; les huit suivants complètent la
- * bibliothèque pour les profils futurs.
- */
 export const SEED_THEMES: SeedTheme[] = [
   {
     name: "Lavande Nature",

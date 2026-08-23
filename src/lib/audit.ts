@@ -16,7 +16,7 @@ export async function logAudit(params: {
       action: params.action,
       targetType: params.targetType,
       targetId: params.targetId,
-      metadata: params.metadata ?? {},
+      metadata: params.metadata as any, // Correction du typage Prisma
     },
   });
 }
