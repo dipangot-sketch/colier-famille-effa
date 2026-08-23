@@ -1,0 +1,565 @@
+// ============================================================
+// COLIER FAMILLE EFFA — Schéma de base de données
+// Conforme à la Partie 3 (Architecture de la base de données)
+// et à la Partie 7 (Architecture technique) du cahier des charges.
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// À partir de Prisma ORM 7, l'URL de connexion ne vit plus ici mais
+// dans prisma.config.ts (utilisé par la CLI pour les migrations) et
+// dans l'adaptateur passé au constructeur de PrismaClient côté
+// application (voir src/lib/prisma.ts). Voir Partie 12 §58 : séparer
+// clairement configuration de build et configuration d'exécution.
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------
+// RÔLES ET PERMISSIONS
+// ------------------------------------------------------------
+
+enum RoleName {
+  MEMBER
+  FAMILY_ADMIN
+  SUPER_ADMIN
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleName @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  users           User[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ------------------------------------------------------------
+// UTILISATEURS ET PROFILS
+// (User = authentification, Profile = identité affichée)
+// ------------------------------------------------------------
+
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String
+  roleId             String
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  lastLoginAt        DateTime?
+
+  role     Role      @relation(fields: [roleId], references: [id])
+  profile  Profile?
+  sessions Session[]
+  auditLogs        AuditLog[]        @relation("AuditActor")
+  sentMessages     Message[]
+  conversationMemberships ConversationMember[]
+  notifications    Notification[]
+  createdQrTokens  QrToken[]         @relation("QrCreatedBy")
+  uploadedMedia    Media[]           @relation("MediaUploadedBy")
+  createdAlbums    Album[]           @relation("AlbumCreatedBy")
+  createdEvents    FamilyEvent[]     @relation("EventCreatedBy")
+  uploadedTracks   MusicTrack[]      @relation("TrackUploadedBy")
+
+  @@index([email])
+  @@map("users")
+}
+
+model Profile {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  displayName    String
+  nickname       String?
+  profileSlug    String    @unique
+  avatarMediaId  String?
+  birthDate      DateTime? @db.Date
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarMedia    Media?           @relation("ProfileAvatar", fields: [avatarMediaId], references: [id])
+  settings       ProfileSettings?
+  qrTokens       QrToken[]
+  letters        Letter[]
+  musicTracks    MusicTrack[]
+  birthday       Birthday?
+  familyEvents   FamilyEvent[]
+
+  @@index([profileSlug])
+  @@map("profiles")
+}
+
+// ------------------------------------------------------------
+// THÈMES ET APPARENCE
+// ------------------------------------------------------------
+
+model Theme {
+  id                String   @id @default(uuid())
+  name              String
+  slug              String   @unique
+  description       String?
+  primaryColor      String
+  secondaryColor    String
+  accentColor       String
+  backgroundColor   String
+  surfaceColor      String
+  textColor         String
+  mutedTextColor    String
+  fontDisplay       String
+  fontBody          String
+  fontLetter        String
+  avatarDefaultShape AvatarShape @default(CIRCLE)
+  cardStyle         String   @default("glass")
+  buttonStyle       String   @default("rounded")
+  decorationConfig  Json     @default("{}")
+  animationConfig   Json     @default("{}")
+  isSystemTheme     Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  profileSettings ProfileSettings[]
+
+  @@map("themes")
+}
+
+enum AvatarShape {
+  CIRCLE
+  HEART
+  SQUARE_ROUNDED
+  HEXAGON
+  DIAMOND
+  OVAL
+  STAR
+}
+
+enum SidebarPosition {
+  LEFT
+  RIGHT
+}
+
+model ProfileSettings {
+  id                  String   @id @default(uuid())
+  profileId           String   @unique
+  themeId             String
+  primaryColorOverride String?
+  fontFamilyOverride  String?
+  avatarShape         AvatarShape @default(CIRCLE)
+  sidebarPosition      SidebarPosition @default(LEFT)
+  backgroundMediaId    String?
+  musicEnabled         Boolean  @default(true)
+  animationsEnabled    Boolean  @default(true)
+  showLetter           Boolean  @default(true)
+  letterScrollEnabled  Boolean  @default(true)
+  configVersion        Int      @default(1)
+  updatedAt            DateTime @updatedAt
+
+  profile         Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  theme           Theme   @relation(fields: [themeId], references: [id])
+  backgroundMedia Media?  @relation("SettingsBackground", fields: [backgroundMediaId], references: [id])
+
+  @@map("profile_settings")
+}
+
+// ------------------------------------------------------------
+// LETTRES
+// ------------------------------------------------------------
+
+model Letter {
+  id             String   @id @default(uuid())
+  profileId      String
+  title          String   @default("Lettre")
+  content        String
+  fontFamily     String   @default("simple")
+  textSize       Int      @default(18)
+  textAlignment  String   @default("center")
+  scrollEnabled  Boolean  @default(true)
+  scrollSpeed    Int      @default(40)
+  opacity        Float    @default(0.92)
+  isLocked       Boolean  @default(false)
+  isCurrent      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("letters")
+}
+
+// ------------------------------------------------------------
+// MUSIQUE
+// ------------------------------------------------------------
+
+model MusicTrack {
+  id           String   @id @default(uuid())
+  profileId    String
+  title        String
+  mediaId      String   @unique
+  isActive     Boolean  @default(true)
+  uploadedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile    Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  media      Media   @relation("TrackMedia", fields: [mediaId], references: [id])
+  uploadedBy User    @relation("TrackUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([profileId])
+  @@map("music_tracks")
+}
+
+// ------------------------------------------------------------
+// MÉDIAS / GALERIE / ALBUMS
+// ------------------------------------------------------------
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  VOICE
+}
+
+model Media {
+  id                   String    @id @default(uuid())
+  uploadedById         String
+  type                 MediaType
+  fileName             String
+  storageKey           String    @unique
+  mimeType             String
+  fileSize             Int
+  width                Int?
+  height               Int?
+  duration             Int?
+  thumbnailStorageKey  String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  uploadedBy        User               @relation("MediaUploadedBy", fields: [uploadedById], references: [id])
+  profileAvatarOf   Profile[]          @relation("ProfileAvatar")
+  settingsBackgroundOf ProfileSettings[] @relation("SettingsBackground")
+  musicTrack        MusicTrack?        @relation("TrackMedia")
+  albumItems        AlbumItem[]
+  messageAttachments MessageAttachment[]
+  birthdayPhotoOf   Birthday[]         @relation("BirthdayPhoto")
+  eventBackgroundOf FamilyEvent[]      @relation("EventBackground")
+  eventMusicOf      FamilyEvent[]      @relation("EventMusic")
+
+  @@map("media")
+}
+
+model Album {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  coverMediaId  String?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdBy User        @relation("AlbumCreatedBy", fields: [createdById], references: [id])
+  items     AlbumItem[]
+
+  @@map("albums")
+}
+
+model AlbumItem {
+  id        String   @id @default(uuid())
+  albumId   String
+  mediaId   String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, mediaId])
+  @@map("album_items")
+}
+
+// ------------------------------------------------------------
+// CHAT FAMILIAL
+// ------------------------------------------------------------
+
+enum ConversationType {
+  FAMILY
+}
+
+model Conversation {
+  id        String           @id @default(uuid())
+  name      String
+  type      ConversationType @default(FAMILY)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+  isActive       Boolean  @default(true)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@map("conversation_members")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VOICE
+  VIDEO
+  SYSTEM
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String?
+  messageType    MessageType @default(TEXT)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+
+  conversation Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                 @relation(fields: [senderId], references: [id])
+  attachments  MessageAttachment[]
+  reads        MessageRead[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid())
+  messageId String
+  mediaId   String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id])
+
+  @@map("message_attachments")
+}
+
+model MessageRead {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("message_reads")
+}
+
+// ------------------------------------------------------------
+// CALENDRIER / ANNIVERSAIRES / ÉVÉNEMENTS
+// ------------------------------------------------------------
+
+model Birthday {
+  id            String    @id @default(uuid())
+  profileId     String?   @unique
+  name          String
+  birthDate     DateTime  @db.Date
+  photoMediaId  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile     Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  photoMedia  Media?   @relation("BirthdayPhoto", fields: [photoMediaId], references: [id])
+
+  @@index([birthDate])
+  @@map("birthdays")
+}
+
+enum EventAnimationType {
+  NONE
+  CONFETTI
+  SPARKLES
+  HEARTS
+  STARS
+  MIXED
+}
+
+model FamilyEvent {
+  id                String             @id @default(uuid())
+  title             String
+  description       String?
+  profileId         String?
+  startAt           DateTime
+  endAt             DateTime
+  backgroundMediaId String?
+  musicTrackMediaId String?
+  message           String?
+  animationType      EventAnimationType @default(NONE)
+  animationConfig    Json               @default("{}")
+  createdById        String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  profile         Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  backgroundMedia Media?   @relation("EventBackground", fields: [backgroundMediaId], references: [id])
+  musicMedia      Media?   @relation("EventMusic", fields: [musicTrackMediaId], references: [id])
+  createdBy       User     @relation("EventCreatedBy", fields: [createdById], references: [id])
+
+  @@index([startAt, endAt])
+  @@map("family_events")
+}
+
+// ------------------------------------------------------------
+// QR CODES / ACCÈS
+// ------------------------------------------------------------
+
+enum QrStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum QrRevokeReason {
+  LOST
+  STOLEN
+  REPLACED
+  SECURITY
+  OTHER
+}
+
+model QrToken {
+  id           String          @id @default(uuid())
+  profileId    String
+  tokenHash    String          @unique
+  status       QrStatus        @default(ACTIVE)
+  label        String?
+  createdById  String
+  createdAt    DateTime        @default(now())
+  revokedAt    DateTime?
+  revokeReason QrRevokeReason?
+  lastUsedAt   DateTime?
+
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("QrCreatedBy", fields: [createdById], references: [id])
+
+  @@index([profileId])
+  @@index([tokenHash])
+  @@map("qr_tokens")
+}
+
+// ------------------------------------------------------------
+// SESSIONS
+// ------------------------------------------------------------
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  sessionTokenHash String    @unique
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  userAgent        String?
+  ipAddress        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionTokenHash])
+  @@map("sessions")
+}
+
+// ------------------------------------------------------------
+// NOTIFICATIONS
+// ------------------------------------------------------------
+
+enum NotificationType {
+  NEW_MESSAGE
+  BIRTHDAY
+  EVENT
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ------------------------------------------------------------
+// JOURNAL D'ACTIVITÉ (AUDIT LOG)
+// ------------------------------------------------------------
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?
+  action       String
+  targetType   String
+  targetId     String?
+  metadata     Json     @default("{}")
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([createdAt])
+  @@index([actorUserId])
+  @@map("audit_logs")
+}
+
+// ------------------------------------------------------------
+// CONFIGURATION SYSTÈME / FEATURE FLAGS
+// ------------------------------------------------------------
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
