@@ -221,3 +221,4 @@ profils, gestion des QR côté Super Admin.
 Aucune fonctionnalité de la Phase 2 n'est simulée dans ce livrable :
 conformément au cahier des charges (Partie 12 §98), rien n'apparaît
 dans le menu tant que ce n'est pas réellement connecté au backend.
+" " 
